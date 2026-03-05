@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Huntertales — Dune Predictor (wallet, no Dune)</title>
+  <script src="https://unpkg.com/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:#0b0c10; --card:#11131a; --muted:#8b93a7; --text:#e9ecf5;
+      --ok:#39d98a; --bad:#ff5c7a; --warn:#ffd66b; --line:#23283a;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Arial;}
+    .wrap{max-width:1150px;margin:28px auto;padding:0 14px;}
+    h1{font-size:18px;margin:0 0 8px}
+    .sub{color:var(--muted);margin:0 0 18px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+    .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+    label{display:block;color:var(--muted);font-size:12px;margin:0 0 6px}
+    input,select,button{border-radius:10px;border:1px solid var(--line);background:#0e1016;color:var(--text);padding:10px 12px;outline:none}
+    input{min-width:360px}
+    select{min-width:120px}
+    button{cursor:pointer;background:#161a27}
+    button:hover{filter:brightness(1.1)}
+    .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:6px 10px;color:var(--muted)}
+    .dot{width:8px;height:8px;border-radius:99px;background:var(--warn)}
+    .dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)}
+    .err{color:var(--bad);white-space:pre-wrap}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{padding:10px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+    th{color:var(--muted);font-weight:600;text-align:left}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace}
+    .small{font-size:12px;color:var(--muted)}
+    .dead{color:var(--bad);font-weight:700}
+    .alive{color:var(--ok);font-weight:700}
+    .party{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{border:1px solid var(--line);border-radius:10px;padding:6px 8px}
+    .tag.dead{border-color:rgba(255,92,122,.6)}
+    .tag.alive{border-color:rgba(57,217,138,.6)}
+    a{color:#9cc2ff;text-decoration:none}
+    a:hover{text-decoration:underline}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Huntertales — предиктор “как в Dune”, но без Dune</h1>
+  <p class="sub">
+    Эта версия <b>не использует deployments()</b>. Она делает то же, что твой Dune‑запрос для stake‑tx:
+    <br/>
+    <span class="mono">eth_getLogs</span> по batch‑ивенту <span class="mono">0xde46a24b…</span> (DungeonV1) → берёт <span class="mono">sector_x/sector_y</span>, список hunterId и индекс (0..n-1),
+    затем берёт <span class="mono">block.timestamp</span> и <span class="mono">block.hash</span> того же блока и считает:
+    <br/>
+    <span class="mono">roll = uint256(keccak(concat(player20, ts32, season32=1, x32, y32, hunterId32, idx32, blockhash32))) % 10000</span>
+    <br/>
+    <span class="small">⚠️ Вводи только публичный address. Никаких seed/private key.</span>
+  </p>
+
+  <div class="card">
+    <div class="controls">
+      <div>
+        <label>Wallet</label>
+        <input id="wallet" class="mono" placeholder="0x..." />
+      </div>
+      <div>
+        <label>Difficulty</label>
+        <select id="difficulty">
+          <option>D1</option><option selected>D2</option><option>D3</option><option>D4</option><option>D5</option><option>D6</option>
+        </select>
+      </div>
+      <button id="runBtn">PREDICT</button>
+      <span class="pill" id="statusPill"><span class="dot"></span><span id="statusTxt">Idle</span></span>
+    </div>
+    <div class="small" style="margin-top:10px">
+      RPC: <span class="mono">https://mainnet.megaeth.com/rpc</span> · Explorer: <a href="https://mega.etherscan.io" target="_blank" rel="noreferrer">mega.etherscan.io</a>
+      <br/>
+      Сканирование идёт с конца цепочки назад, пока не найдёт ~25 stake‑ивентов или не пройдёт ~1,000,000 блоков.
+    </div>
+    <div id="err" class="err" style="margin-top:10px;display:none"></div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <div style="overflow:auto">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width:160px">Time</th>
+            <th style="min-width:120px">Sector</th>
+            <th style="min-width:120px">Block</th>
+            <th style="min-width:230px">Stake tx</th>
+            <th>Party (predicted)</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="5" class="small">Нажми PREDICT…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <div class="small">
+      Почему я убрал <span class="mono">season</span> и <span class="mono">max parties</span>:
+      <br/>• В твоём Dune‑коде <span class="mono">season</span> захардкожен как <span class="mono">...0001</span> → тут он всегда 1.
+      <br/>• <span class="mono">max parties</span> был нужен только чтобы не убить браузер. Тут я сделал авто‑лимит: ищем до 25 ивентов.
+    </div>
+  </div>
+</div>
+
+<script>
+/** === constants from your Dune === */
+const RPC   = "https://mainnet.megaeth.com/rpc";
+const PROXY = "0xd8c7079ac26d5e749bfe2c6c6f0e2617cc14dd7f"; // DungeonV1
+const BATCH_SIG = "0xde46a24bd2bb7c32c4d7f4a89fae5b9dc30e0980d7a22a8c9600f6765a8d940b";
+
+/** scan tuning (no UI) */
+const TARGET_EVENTS = 25;
+const CHUNK = 50000;            // blocks per getLogs query
+const MAX_LOOKBACK = 1000000;   // stop after scanning this many blocks
+
+/** hunter names (same set as your Dune, optional display) */
+const HUNTER_NAME = new Map([
+  [1,'Inori'],[2,'Akira'],[3,'Aiden'],[4,'Naia'],
+  [5,'Ori'],[6,'Faye'],[7,'Robin'],[8,'Valkara'],
+  [9,'Ren'],[10,'Garrick'],[11,'Jin'],[12,'Anastasia'],
+  [13,'Soren'],[14,'Casca'],[15,'Elara'],[16,'Saber'],
+  [17,'Yuki'],[18,'Cael'],[19,'Gojo'],[20,'Celeste'],
+  [21,'Tomoe'],[22,'Seraph'],[23,'Elara'],[24,'Lucian'],
+]);
+function rarityTag(id){
+  if(id>=1 && id<=4) return "C";
+  if(id>=5 && id<=8) return "U";
+  if(id>=9 && id<=12) return "R";
+  if(id>=13 && id<=16) return "E";
+  if(id>=17 && id<=20) return "L";
+  if(id>=21 && id<=24) return "T";
+  return "?";
+}
+
+/** === UI === */
+const $ = (id)=>document.getElementById(id);
+function setStatus(text, kind="warn"){
+  $("statusTxt").textContent = text;
+  const dot = $("statusPill").querySelector(".dot");
+  dot.classList.remove("ok","bad");
+  if(kind==="ok") dot.classList.add("ok");
+  if(kind==="bad") dot.classList.add("bad");
+}
+function showErr(msg){
+  const el = $("err");
+  el.style.display = msg ? "block" : "none";
+  el.textContent = msg || "";
+}
+
+/** === RPC === */
+let rpcId = 1;
+async function rpc(method, params){
+  const body = {jsonrpc:"2.0", id: rpcId++, method, params};
+  const res = await fetch(RPC, {
+    method:"POST",
+    headers: {"content-type":"application/json"},
+    body: JSON.stringify(body)
+  });
+  const j = await res.json();
+  if(j.error) throw new Error(j.error.message || JSON.stringify(j.error));
+  return j.result;
+}
+async function rpcBatch(reqs){
+  const payload = reqs.map((r,i)=>({jsonrpc:"2.0", id:i, ...r}));
+  const res = await fetch(RPC, {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify(payload)});
+  const j = await res.json();
+  if(!Array.isArray(j)) return [];
+  // map by id
+  const out = [];
+  for(const it of j){
+    if(it.error) out[it.id] = {error: it.error};
+    else out[it.id] = {result: it.result};
+  }
+  return out;
+}
+
+/** === Dune-equivalent packing helpers === */
+function addrTopic(a){ return "0x"+a.toLowerCase().replace(/^0x/,"").padStart(64,"0"); }
+
+// Dune used: from_hex(24 zeros) + to_big_endian_64(x)  -> 32 bytes
+function pad32_from_u64(x){
+  let v = BigInt(x);
+  // keep last 64 bits (matches uint64 cast)
+  v = v & ((1n<<64n)-1n);
+  const out = new Uint8Array(32);
+  for(let i=31;i>=24;i--){
+    out[i] = Number(v & 0xffn);
+    v >>= 8n;
+  }
+  return out;
+}
+
+// season in Dune is literal 0x..01 (32 bytes)
+const SEASON32 = (() => {
+  const out = new Uint8Array(32);
+  out[31] = 1;
+  return out;
+})();
+
+function deathChanceBpsFromDifficulty(diff){
+  const d = String(diff).trim().toUpperCase();
+  if(d==="D1") return 800;
+  if(d==="D2") return 1800;
+  if(d==="D3") return 3200;
+  if(d==="D4") return 4000;
+  if(d==="D5") return 5000;
+  if(d==="D6") return 6000;
+  return 1800;
+}
+
+function predictDuneStyle({player20, timestampSec, sectorX, sectorY, hunterId, hunterIndex, blockHash}, deathChanceBps){
+  const payload = ethers.concat([
+    player20,                         // 20 bytes
+    pad32_from_u64(timestampSec),      // 32 bytes
+    SEASON32,                          // 32 bytes (…01)
+    pad32_from_u64(sectorX),           // 32 bytes
+    pad32_from_u64(sectorY),           // 32 bytes
+    pad32_from_u64(hunterId),          // 32 bytes
+    pad32_from_u64(hunterIndex),       // 32 bytes
+    ethers.getBytes(blockHash)         // 32 bytes
+  ]);
+  const seed = ethers.keccak256(payload);
+  const roll = Number(BigInt(seed) % 10000n);
+  return { seed, roll, survived: roll >= deathChanceBps };
+}
+
+/** === decode batch_event data exactly like your Dune offsets === */
+function hexToWords32(dataHex){
+  const h = dataHex.startsWith("0x") ? dataHex.slice(2) : dataHex;
+  const words = [];
+  for(let i=0;i<h.length;i+=64){
+    words.push(h.slice(i,i+64).padEnd(64,"0"));
+  }
+  return words;
+}
+function wordToBigInt(w){ return BigInt("0x"+w); }
+
+function decodeBatchEvent(log){
+  const words = hexToWords32(log.data);
+  // Dune: sector_x = substring(data,1,32) -> word0 ; sector_y -> word1
+  const sectorX = wordToBigInt(words[0] || "0");
+  const sectorY = wordToBigInt(words[1] || "0");
+  // Dune: crown_estimate at byte 160 (word5) / 1e17 (optional)
+  const crownEstRaw = wordToBigInt(words[5] || "0");
+  // Dune: num_hunters at byte 192 (word6)
+  const numHunters = Number(wordToBigInt(words[6] || "0"));
+  // Dune: token list starts at byte 224 (word7)
+  const traits = [];
+  for(let i=0;i<numHunters && i<8;i++){
+    const w = words[7+i];
+    if(!w) break;
+    traits.push(Number(wordToBigInt(w)));
+  }
+  return { sectorX:Number(sectorX), sectorY:Number(sectorY), numHunters, traits, crownEstRaw };
+}
+
+/** === render === */
+function renderRows(rows){
+  const tb = $("tbody");
+  tb.innerHTML = "";
+  if(!rows.length){
+    tb.innerHTML = `<tr><td colspan="5" class="small">Не найдено batch‑ивентов (0xde46a24b…) в последнем диапазоне.</td></tr>`;
+    return;
+  }
+
+  for(const r of rows){
+    const timeStr = r.timeMs ? new Date(r.timeMs).toLocaleString() : "—";
+    const sector = `(${r.sectorX},${r.sectorY})`;
+    const txShort = r.txHash ? `${r.txHash.slice(0,10)}…${r.txHash.slice(-6)}` : "—";
+    const txLink = r.txHash ? `https://mega.etherscan.io/tx/${r.txHash}` : "#";
+
+    const partyHtml = (r.party || []).map(h => {
+      const cls = h.survived ? "alive" : "dead";
+      const label = `${h.name} (${h.rarity}) · roll=${h.roll}`;
+      return `<span class="tag ${cls}" title="${h.seed}">${h.survived ? 'OK' : 'DEAD'} · ${label}</span>`;
+    }).join("");
+
+    tb.insertAdjacentHTML("beforeend", `
+      <tr>
+        <td>${timeStr}</td>
+        <td><span class="mono">${sector}</span></td>
+        <td><span class="mono">#${r.blockNumber}</span></td>
+        <td class="mono"><a href="${txLink}" target="_blank" rel="noreferrer">${txShort}</a></td>
+        <td><div class="party">${partyHtml || `<span class="small">—</span>`}</div></td>
+      </tr>
+    `);
+  }
+}
+
+/** === main === */
+async function run(){
+  showErr("");
+  const w = $("wallet").value.trim();
+  if(!w) { showErr("Вставь wallet address (0x...)"); return; }
+  let wallet;
+  try { wallet = ethers.getAddress(w); } catch(e){ showErr("Невалидный адрес: " + e.message); return; }
+
+  const deathChanceBps = deathChanceBpsFromDifficulty($("difficulty").value);
+  const wTopic = addrTopic(wallet);
+
+  setStatus("Getting latest block…");
+  const latestHex = await rpc("eth_blockNumber", []);
+  const latest = Number(BigInt(latestHex));
+
+  // scan backwards
+  setStatus("Scanning logs…");
+  const logs = [];
+  let scanned = 0;
+  let toBlock = latest;
+  while(logs.length < TARGET_EVENTS && scanned < MAX_LOOKBACK){
+    const fromBlock = Math.max(0, toBlock - CHUNK + 1);
+    const filter = {
+      address: PROXY,
+      topics: [BATCH_SIG, wTopic],
+      fromBlock: "0x"+fromBlock.toString(16),
+      toBlock: "0x"+toBlock.toString(16),
+    };
+    let chunkLogs = [];
+    try{
+      chunkLogs = await rpc("eth_getLogs", [filter]) || [];
+    }catch(e){
+      // if provider is picky, shrink chunk and retry once
+      if(CHUNK > 10000){
+        showErr("RPC ограничил eth_getLogs. Попробуй ещё раз (я буду сканить более мелкими чанками).");
+      }
+      throw e;
+    }
+    // add newest first later; keep as is then sort
+    logs.push(...chunkLogs);
+    scanned += (toBlock - fromBlock + 1);
+    toBlock = fromBlock - 1;
+    setStatus(`Scanning… found ${logs.length} (lookback ${scanned} blocks)`);
+    if(toBlock <= 0) break;
+  }
+
+  if(!logs.length){
+    setStatus("No events", "bad");
+    renderRows([]);
+    return;
+  }
+
+  // sort desc by blockNumber + logIndex
+  logs.sort((a,b)=>{
+    const ab = Number(BigInt(a.blockNumber));
+    const bb = Number(BigInt(b.blockNumber));
+    if(ab !== bb) return bb - ab;
+    const ai = Number(BigInt(a.logIndex));
+    const bi = Number(BigInt(b.logIndex));
+    return bi - ai;
+  });
+
+  // keep only latest TARGET_EVENTS
+  const useLogs = logs.slice(0, TARGET_EVENTS);
+
+  // fetch blocks (hash + timestamp) in batch
+  setStatus("Fetching blocks…");
+  const uniqBlocks = [...new Set(useLogs.map(l => Number(BigInt(l.blockNumber))))];
+  const blockReqs = uniqBlocks.map(bn => ({method:"eth_getBlockByNumber", params:["0x"+bn.toString(16), false]}));
+  const blockRes = await rpcBatch(blockReqs);
+  const blockMap = new Map();
+  for(let i=0;i<uniqBlocks.length;i++){
+    const bn = uniqBlocks[i];
+    const r = blockRes[i]?.result;
+    if(r && r.hash && r.timestamp){
+      blockMap.set(bn, {hash:r.hash, ts:Number(BigInt(r.timestamp))});
+    }
+  }
+
+  setStatus("Predicting…");
+  const player20 = ethers.getBytes(wallet); // 20 bytes
+
+  const rows = useLogs.map(l => {
+    const bn = Number(BigInt(l.blockNumber));
+    const txHash = l.transactionHash;
+    const blk = blockMap.get(bn);
+    const ts = blk?.ts ?? 0;
+    const blockHash = blk?.hash ?? null;
+
+    const decoded = decodeBatchEvent(l);
+    const party = [];
+    if(blockHash){
+      for(let i=0;i<decoded.traits.length;i++){
+        const hunterId = decoded.traits[i];
+        const pr = predictDuneStyle({
+          player20,
+          timestampSec: ts,
+          sectorX: decoded.sectorX,
+          sectorY: decoded.sectorY,
+          hunterId,
+          hunterIndex: i,
+          blockHash
+        }, deathChanceBps);
+
+        const name = HUNTER_NAME.get(hunterId) || ("#"+hunterId);
+        party.push({
+          hunterId,
+          idx: i,
+          name,
+          rarity: rarityTag(hunterId),
+          roll: pr.roll,
+          seed: pr.seed,
+          survived: pr.survived
+        });
+      }
+    }
+
+    return {
+      timeMs: ts ? ts*1000 : null,
+      sectorX: decoded.sectorX,
+      sectorY: decoded.sectorY,
+      blockNumber: bn,
+      txHash,
+      party
+    };
+  });
+
+  renderRows(rows);
+  setStatus("Done", "ok");
+}
+
+$("runBtn").addEventListener("click", () => {
+  run().catch(e => {
+    console.error(e);
+    setStatus("Error", "bad");
+    showErr(String(e?.message || e));
+  });
+});
+</script>
+</body>
+</html>
