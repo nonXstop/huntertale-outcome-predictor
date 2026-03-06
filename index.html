@@ -1,124 +1,263 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Huntertales — Dune Predictor (wallet, no Dune)</title>
+  <title>Huntertales — Active Deployment Predictor</title>
   <script src="https://unpkg.com/ethers@6.13.4/dist/ethers.umd.min.js"></script>
   <style>
     :root{
-      --bg:#0b0c10; --card:#11131a; --muted:#8b93a7; --text:#e9ecf5;
-      --ok:#39d98a; --bad:#ff5c7a; --warn:#ffd66b; --line:#23283a;
+      --bg:#0b0d12;
+      --panel:#11141c;
+      --panel2:#0f1218;
+      --border:#252a36;
+      --border2:#303648;
+      --text:#e8ebf5;
+      --muted:#9aa3b5;
+      --muted2:#77809a;
+      --ok:#2ee59d;
+      --bad:#ff5c7a;
+      --warn:#ffd166;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      --r:14px;
     }
     *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Arial;}
-    .wrap{max-width:1150px;margin:28px auto;padding:0 14px;}
-    h1{font-size:18px;margin:0 0 8px}
-    .sub{color:var(--muted);margin:0 0 18px}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
-    .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
-    label{display:block;color:var(--muted);font-size:12px;margin:0 0 6px}
-    input,select,button{border-radius:10px;border:1px solid var(--line);background:#0e1016;color:var(--text);padding:10px 12px;outline:none}
-    input{min-width:360px}
-    select{min-width:120px}
-    button{cursor:pointer;background:#161a27}
-    button:hover{filter:brightness(1.1)}
-    .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:6px 10px;color:var(--muted)}
-    .dot{width:8px;height:8px;border-radius:99px;background:var(--warn)}
-    .dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)}
-    .err{color:var(--bad);white-space:pre-wrap}
-    table{width:100%;border-collapse:collapse;font-size:13px}
-    th,td{padding:10px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-    th{color:var(--muted);font-weight:600;text-align:left}
-    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace}
-    .small{font-size:12px;color:var(--muted)}
-    .dead{color:var(--bad);font-weight:700}
-    .alive{color:var(--ok);font-weight:700}
-    .party{display:flex;flex-wrap:wrap;gap:6px}
-    .tag{border:1px solid var(--line);border-radius:10px;padding:6px 8px}
-    .tag.dead{border-color:rgba(255,92,122,.6)}
-    .tag.alive{border-color:rgba(57,217,138,.6)}
-    a{color:#9cc2ff;text-decoration:none}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font:14px/1.45 var(--sans);
+      color:var(--text);
+      background:var(--bg);
+    }
+    a{color:#9ec5ff;text-decoration:none}
     a:hover{text-decoration:underline}
+    .app{max-width:1200px;margin:0 auto;padding:18px 14px 64px}
+
+    /* top bar */
+    .topbar{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+      padding:14px 14px;
+      border:1px solid var(--border);
+      border-radius:var(--r);
+      background:var(--panel);
+    }
+    .title{display:flex;align-items:center;gap:12px;min-width:260px}
+    .mark{
+      width:40px;height:40px;border-radius:12px;
+      border:1px solid var(--border2);
+      background:var(--panel2);
+      display:flex;align-items:center;justify-content:center;
+      font-weight:800;letter-spacing:.4px;
+    }
+    .h1{font-weight:800;font-size:16px;letter-spacing:.2px}
+    .sub{color:var(--muted);font-size:12.5px;margin-top:2px;max-width:820px}
+    .rightMeta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+    .pill{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:8px 10px;
+      border:1px solid var(--border);
+      border-radius:999px;
+      background:var(--panel2);
+      color:var(--muted);
+      white-space:nowrap;
+      font-size:12px;
+    }
+    .dot{width:8px;height:8px;border-radius:99px;background:var(--warn)}
+    .dot.ok{background:var(--ok)}
+    .dot.bad{background:var(--bad)}
+
+    /* controls */
+    .controls{
+      margin-top:12px;
+      border:1px solid var(--border);
+      border-radius:var(--r);
+      background:var(--panel);
+      padding:14px;
+    }
+    .controlsRow{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+    label{display:block;color:var(--muted2);font-size:12px;margin:0 0 6px}
+    input,button{
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:var(--panel2);
+      color:var(--text);
+      padding:10px 12px;
+      outline:none;
+    }
+    input:focus{border-color:#6ea8ff; box-shadow:0 0 0 3px rgba(110,168,255,.14)}
+    input.mono{font-family:var(--mono)}
+    input.wallet{min-width:420px}
+    @media (max-width: 520px){ input.wallet{min-width:0;width:100%} }
+    button{cursor:pointer;font-weight:700}
+    button:hover{border-color:#6ea8ff}
+    button:active{transform:translateY(1px)}
+    .small{color:var(--muted);font-size:12px;margin-top:10px}
+    .err{
+      margin-top:10px;
+      border:1px solid rgba(255,92,122,.45);
+      background:rgba(255,92,122,.08);
+      padding:10px 12px;
+      border-radius:12px;
+      color:#ffd0d9;
+      display:none;
+      white-space:pre-wrap;
+    }
+
+    /* results */
+    .results{
+      margin-top:12px;
+      border:1px solid var(--border);
+      border-radius:var(--r);
+      background:var(--panel);
+      padding:14px;
+    }
+    .resultsHead{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap}
+    .resultsTitle{font-weight:800;letter-spacing:.2px}
+    .count{color:var(--muted);font-size:12px;margin-top:4px}
+    .last{color:var(--muted);font-size:12px}
+    .list{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+
+    .deploy{
+      border:1px solid var(--border);
+      background:var(--panel2);
+      border-radius:14px;
+      padding:12px;
+    }
+    .deployHead{
+      display:grid;
+      grid-template-columns: 1.1fr .7fr .6fr 1.2fr 220px;
+      gap:10px;
+      align-items:start;
+    }
+    @media (max-width: 980px){
+      .deployHead{grid-template-columns:1fr 1fr;}
+      .deployHead .dr{grid-column:1 / -1; justify-self:stretch;}
+    }
+    .cell .k{color:var(--muted2);font-size:11.5px;margin-bottom:4px}
+    .cell .v{font-size:13px}
+    .mono{font-family:var(--mono)}
+    .tx a{font-family:var(--mono)}
+    .dr{justify-self:end}
+    @media (max-width: 980px){ .dr{justify-self:stretch} }
+    .dr input{width:100%}
+    .drInfo{color:var(--muted);font-size:12px;margin-top:6px}
+    .party{
+      margin-top:10px;
+      display:grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap:8px;
+    }
+    @media (max-width: 980px){ .party{grid-template-columns: repeat(2, minmax(0, 1fr));} }
+    @media (max-width: 520px){ .party{grid-template-columns: 1fr;} }
+
+    .unit{
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:10px 10px;
+      background:var(--panel);
+      font-family:var(--mono);
+      font-size:12px;
+      line-height:1.3;
+      cursor:pointer;
+      user-select:text;
+    }
+    .unit:hover{border-color:var(--border2)}
+    .unit.ok{border-color:rgba(46,229,157,.55); color:rgba(46,229,157,.95)}
+    .unit.bad{border-color:rgba(255,92,122,.55); color:rgba(255,92,122,.95)}
+    .unit.neutral{color:rgba(232,235,245,.92)}
+    .unit .topline{display:flex;justify-content:space-between;gap:8px}
+    .unit .tag{opacity:.9}
+    .unit .roll{opacity:.95}
+    .unit .name{margin-top:6px;color:var(--text)}
+    .unit.ok .name{color:rgba(46,229,157,.95)}
+    .unit.bad .name{color:rgba(255,92,122,.95)}
+
+    /* toast */
+    .toast{
+      position:fixed;
+      left:50%;
+      bottom:18px;
+      transform:translateX(-50%);
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:rgba(17,20,28,.92);
+      color:var(--text);
+      font-size:12px;
+      display:none;
+      max-width:calc(100vw - 24px);
+    }
   </style>
 </head>
+
 <body>
-<div class="wrap">
-  <h1>Huntertales — предиктор “как в Dune”, но без Dune</h1>
-  <p class="sub">
-    Эта версия <b>не использует deployments()</b>. Она делает то же, что твой Dune‑запрос для stake‑tx:
-    <br/>
-    <span class="mono">eth_getLogs</span> по batch‑ивенту <span class="mono">0xde46a24b…</span> (DungeonV1) → берёт <span class="mono">sector_x/sector_y</span>, список hunterId и индекс (0..n-1),
-    затем берёт <span class="mono">block.timestamp</span> и <span class="mono">block.hash</span> того же блока и считает:
-    <br/>
-    <span class="mono">roll = uint256(keccak(concat(player20, ts32, season32=1, x32, y32, hunterId32, idx32, blockhash32))) % 10000</span>
-    <br/>
-    <span class="small">⚠️ Вводи только публичный address. Никаких seed/private key.</span>
-  </p>
+  <div class="app">
+    <div class="topbar">
+      <div class="title">
+        <div class="mark">HT</div>
+        <div>
+          <div class="h1">Huntertales — Active Deployment Predictor</div>
+          <div class="sub">Scans your wallet for <b>active</b> deployments (no outcome tx yet). Enter <b>Custom DR</b> per deployment in <b>bps</b> (e.g. 3520 = 35.20%). Click a hunter card to copy its full seed.</div>
+        </div>
+      </div>
+      <div class="rightMeta">
+        <span class="pill"><span class="dot" id="dot"></span><span id="statusTxt">Idle</span></span>
+        <span class="pill">Explorer: <a href="https://mega.etherscan.io" target="_blank" rel="noreferrer">mega.etherscan.io</a></span>
+      </div>
+    </div>
 
-  <div class="card">
     <div class="controls">
-      <div>
-        <label>Wallet</label>
-        <input id="wallet" class="mono" placeholder="0x..." />
+      <div class="controlsRow">
+        <div style="flex:1;min-width:260px">
+          <label>Wallet address</label>
+          <input id="wallet" class="wallet mono" placeholder="0x..." autocomplete="off" spellcheck="false" />
+        </div>
+        <div>
+          <button id="runBtn">Scan</button>
+        </div>
       </div>
-      <div>
-        <label>Difficulty</label>
-        <select id="difficulty">
-          <option>D1</option><option selected>D2</option><option>D3</option><option>D4</option><option>D5</option><option>D6</option>
-        </select>
-      </div>
-      <button id="runBtn">PREDICT</button>
-      <span class="pill" id="statusPill"><span class="dot"></span><span id="statusTxt">Idle</span></span>
+      <div id="err" class="err"></div>
+      <div class="small">RPC: <span class="mono" id="rpcLabel"></span></div>
     </div>
-    <div class="small" style="margin-top:10px">
-      RPC: <span class="mono">https://mainnet.megaeth.com/rpc</span> · Explorer: <a href="https://mega.etherscan.io" target="_blank" rel="noreferrer">mega.etherscan.io</a>
-      <br/>
-      Сканирование идёт с конца цепочки назад, пока не найдёт ~25 stake‑ивентов или не пройдёт ~1,000,000 блоков.
-    </div>
-    <div id="err" class="err" style="margin-top:10px;display:none"></div>
-  </div>
 
-  <div class="card" style="margin-top:12px">
-    <div style="overflow:auto">
-      <table>
-        <thead>
-          <tr>
-            <th style="min-width:160px">Time</th>
-            <th style="min-width:120px">Sector</th>
-            <th style="min-width:120px">Block</th>
-            <th style="min-width:230px">Stake tx</th>
-            <th>Party (predicted)</th>
-          </tr>
-        </thead>
-        <tbody id="tbody">
-          <tr><td colspan="5" class="small">Нажми PREDICT…</td></tr>
-        </tbody>
-      </table>
+    <div class="results">
+      <div class="resultsHead">
+        <div>
+          <div class="resultsTitle">Results</div>
+          <div class="count" id="countTxt">No data yet.</div>
+        </div>
+        <div class="last" id="lastScanTxt"></div>
+      </div>
+      <div id="list" class="list">
+        <div class="count">Click “Scan”.</div>
+      </div>
     </div>
   </div>
 
-  <div class="card" style="margin-top:12px">
-    <div class="small">
-      Почему я убрал <span class="mono">season</span> и <span class="mono">max parties</span>:
-      <br/>• В твоём Dune‑коде <span class="mono">season</span> захардкожен как <span class="mono">...0001</span> → тут он всегда 1.
-      <br/>• <span class="mono">max parties</span> был нужен только чтобы не убить браузер. Тут я сделал авто‑лимит: ищем до 25 ивентов.
-    </div>
-  </div>
-</div>
+  <div class="toast" id="toast"></div>
 
 <script>
-/** === constants from your Dune === */
-const RPC   = "https://mainnet.megaeth.com/rpc";
-const PROXY = "0xd8c7079ac26d5e749bfe2c6c6f0e2617cc14dd7f"; // DungeonV1
+/** === network === */
+const RPC = "https://mainnet.megaeth.com/rpc";
+document.getElementById("rpcLabel").textContent = RPC;
+
+/** === contracts === */
+const GAME  = "0x10005362672739146e5ced461ec3e9fd50ee55d1";     // game state
+const PROXY = "0xd8c7079ac26d5e749bfe2c6c6f0e2617cc14dd7f";     // DungeonV1 proxy
+const GAME_ID = 1;
+
+/** logs */
 const BATCH_SIG = "0xde46a24bd2bb7c32c4d7f4a89fae5b9dc30e0980d7a22a8c9600f6765a8d940b";
 
-/** scan tuning (no UI) */
-const TARGET_EVENTS = 25;
-const CHUNK = 50000;            // blocks per getLogs query
-const MAX_LOOKBACK = 1000000;   // stop after scanning this many blocks
+/** heuristics */
+const STAKE_LOOKBACK_BLOCKS = 300000;   // recent stake logs should cover active deployments
+const STAKE_CHUNK = 50000;
 
-/** hunter names (same set as your Dune, optional display) */
+/** season = 1 */
+const SEASON32 = (() => { const out = new Uint8Array(32); out[31]=1; return out; })();
+
+/** hunter labels */
 const HUNTER_NAME = new Map([
   [1,'Inori'],[2,'Akira'],[3,'Aiden'],[4,'Naia'],
   [5,'Ori'],[6,'Faye'],[7,'Robin'],[8,'Valkara'],
@@ -137,22 +276,31 @@ function rarityTag(id){
   return "?";
 }
 
-/** === UI === */
+/** UI */
 const $ = (id)=>document.getElementById(id);
 function setStatus(text, kind="warn"){
   $("statusTxt").textContent = text;
-  const dot = $("statusPill").querySelector(".dot");
+  const dot = $("dot");
   dot.classList.remove("ok","bad");
+  dot.style.background = "";
   if(kind==="ok") dot.classList.add("ok");
-  if(kind==="bad") dot.classList.add("bad");
+  else if(kind==="bad") dot.classList.add("bad");
 }
 function showErr(msg){
   const el = $("err");
   el.style.display = msg ? "block" : "none";
   el.textContent = msg || "";
 }
+let toastTimer = null;
+function toast(msg){
+  const t = $("toast");
+  t.textContent = msg;
+  t.style.display = "block";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ t.style.display = "none"; }, 1400);
+}
 
-/** === RPC === */
+/** RPC */
 let rpcId = 1;
 async function rpc(method, params){
   const body = {jsonrpc:"2.0", id: rpcId++, method, params};
@@ -170,7 +318,6 @@ async function rpcBatch(reqs){
   const res = await fetch(RPC, {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify(payload)});
   const j = await res.json();
   if(!Array.isArray(j)) return [];
-  // map by id
   const out = [];
   for(const it of j){
     if(it.error) out[it.id] = {error: it.error};
@@ -179,13 +326,9 @@ async function rpcBatch(reqs){
   return out;
 }
 
-/** === Dune-equivalent packing helpers === */
-function addrTopic(a){ return "0x"+a.toLowerCase().replace(/^0x/,"").padStart(64,"0"); }
-
-// Dune used: from_hex(24 zeros) + to_big_endian_64(x)  -> 32 bytes
+/** helpers */
 function pad32_from_u64(x){
   let v = BigInt(x);
-  // keep last 64 bits (matches uint64 cast)
   v = v & ((1n<<64n)-1n);
   const out = new Uint8Array(32);
   for(let i=31;i>=24;i--){
@@ -194,42 +337,19 @@ function pad32_from_u64(x){
   }
   return out;
 }
+function shortHex(h){ return h ? `${h.slice(0,10)}…${h.slice(-6)}` : "—"; }
+function addrTopic(a){ return "0x"+a.toLowerCase().replace(/^0x/,"").padStart(64,"0"); }
 
-// season in Dune is literal 0x..01 (32 bytes)
-const SEASON32 = (() => {
-  const out = new Uint8Array(32);
-  out[31] = 1;
-  return out;
-})();
+/** ABI-like decoding helpers */
+const pu = (n)=>BigInt(n).toString(16).padStart(64,"0");                 // uint256 word
+const pa = (a)=>a.toLowerCase().replace("0x","").padStart(64,"0");       // address word
+const wb = (hexNo0x, byteOffset)=>{
+  const s = hexNo0x.slice(byteOffset*2, byteOffset*2 + 64);
+  return s.length === 64 ? BigInt("0x"+s) : 0n;
+};
+const wn = (hexNo0x, byteOffset)=> Number(wb(hexNo0x, byteOffset));
 
-function deathChanceBpsFromDifficulty(diff){
-  const d = String(diff).trim().toUpperCase();
-  if(d==="D1") return 800;
-  if(d==="D2") return 1800;
-  if(d==="D3") return 3200;
-  if(d==="D4") return 4000;
-  if(d==="D5") return 5000;
-  if(d==="D6") return 6000;
-  return 1800;
-}
-
-function predictDuneStyle({player20, timestampSec, sectorX, sectorY, hunterId, hunterIndex, blockHash}, deathChanceBps){
-  const payload = ethers.concat([
-    player20,                         // 20 bytes
-    pad32_from_u64(timestampSec),      // 32 bytes
-    SEASON32,                          // 32 bytes (…01)
-    pad32_from_u64(sectorX),           // 32 bytes
-    pad32_from_u64(sectorY),           // 32 bytes
-    pad32_from_u64(hunterId),          // 32 bytes
-    pad32_from_u64(hunterIndex),       // 32 bytes
-    ethers.getBytes(blockHash)         // 32 bytes
-  ]);
-  const seed = ethers.keccak256(payload);
-  const roll = Number(BigInt(seed) % 10000n);
-  return { seed, roll, survived: roll >= deathChanceBps };
-}
-
-/** === decode batch_event data exactly like your Dune offsets === */
+/** decode batch event data */
 function hexToWords32(dataHex){
   const h = dataHex.startsWith("0x") ? dataHex.slice(2) : dataHex;
   const words = [];
@@ -239,113 +359,266 @@ function hexToWords32(dataHex){
   return words;
 }
 function wordToBigInt(w){ return BigInt("0x"+w); }
-
 function decodeBatchEvent(log){
   const words = hexToWords32(log.data);
-  // Dune: sector_x = substring(data,1,32) -> word0 ; sector_y -> word1
-  const sectorX = wordToBigInt(words[0] || "0");
-  const sectorY = wordToBigInt(words[1] || "0");
-  // Dune: crown_estimate at byte 160 (word5) / 1e17 (optional)
-  const crownEstRaw = wordToBigInt(words[5] || "0");
-  // Dune: num_hunters at byte 192 (word6)
+  const sectorX = Number(wordToBigInt(words[0] || "0"));
+  const sectorY = Number(wordToBigInt(words[1] || "0"));
   const numHunters = Number(wordToBigInt(words[6] || "0"));
-  // Dune: token list starts at byte 224 (word7)
   const traits = [];
   for(let i=0;i<numHunters && i<8;i++){
     const w = words[7+i];
     if(!w) break;
     traits.push(Number(wordToBigInt(w)));
   }
-  return { sectorX:Number(sectorX), sectorY:Number(sectorY), numHunters, traits, crownEstRaw };
+  return { sectorX, sectorY, numHunters, traits };
 }
 
-/** === render === */
-function renderRows(rows){
-  const tb = $("tbody");
-  tb.innerHTML = "";
+/** chunked logs (descending) */
+async function getLogsChunked({address, topics, fromBlock, toBlock, chunkSize, onProgress}){
+  const out = [];
+  let curTo = toBlock;
+  while(curTo >= fromBlock){
+    const curFrom = Math.max(fromBlock, curTo - chunkSize + 1);
+    const filter = {
+      address,
+      topics,
+      fromBlock: "0x"+curFrom.toString(16),
+      toBlock: "0x"+curTo.toString(16),
+    };
+    const logs = await rpc("eth_getLogs", [filter]) || [];
+    out.push(...logs);
+    if(onProgress) onProgress({curFrom, curTo, total: out.length});
+    curTo = curFrom - 1;
+  }
+  return out;
+}
+
+/** Reads active deployments from GAME contract. */
+async function fetchDeployments(wallet){
+  // selector 0xa4b80a50
+  const data = "0xa4b80a50" + pu(GAME_ID) + pa(wallet);
+  const r = await rpc("eth_call", [{to: GAME, data}, "latest"]);
+  const h = r.slice(2);
+
+  const count = wn(h, 32);
+  if(!count) return [];
+
+  const BASE = 64;
+  const out = [];
+  for(let i=0;i<count;i++){
+    const entryOffset = wn(h, BASE + i*32);
+    const base = BASE + entryOffset;
+
+    const ts   = wn(h, base);
+    const a1o  = wn(h, base + 32);
+    const a2o  = wn(h, base + 64);
+
+    const x    = wn(h, base + 4*32);
+    const y    = wn(h, base + 5*32);
+
+    const blockNum = wn(h, base + 7*32); // fallback only
+    const powerWei = wb(h, base + 8*32);
+
+    const a1   = base + a1o;
+    const hc   = wn(h, a1);
+    const traits = [];
+    for(let j=0;j<hc && j<8; j++){
+      traits.push(wn(h, a1 + 32 + j*32));
+    }
+
+    const a2   = base + a2o;
+    const sc   = wn(h, a2);
+    const survived = [];
+    for(let j=0;j<sc && j<8; j++){
+      survived.push(wn(h, a2 + 32 + j*32) > 0);
+    }
+
+    out.push({ id:i, ts, x, y, blockNum, powerWei, traits, survived });
+  }
+  return out;
+}
+
+/** prediction (roll only) */
+function computeRoll({player20, timestampSec, sectorX, sectorY, hunterId, hunterIndex, blockHash}){
+  const payload = ethers.concat([
+    player20,
+    pad32_from_u64(timestampSec),
+    SEASON32,
+    pad32_from_u64(sectorX),
+    pad32_from_u64(sectorY),
+    pad32_from_u64(hunterId),
+    pad32_from_u64(hunterIndex),
+    ethers.getBytes(blockHash)
+  ]);
+  const seed = ethers.keccak256(payload);
+  const roll = Number(BigInt(seed) % 10000n);
+  return { seed, roll };
+}
+
+/** state */
+let state = {
+  customDR: new Map(),   // depKey -> number(bps)
+  rows: []
+};
+
+function depKey(dep){ return `${dep.id}:${dep.x},${dep.y}:${(dep.traits||[]).join(",")}`; }
+function stakeKey(x,y,traits){ return `${x},${y}|${(traits||[]).join(",")}`; }
+
+function render(){
+  const list = $("list");
+  list.innerHTML = "";
+
+  const rows = state.rows || [];
+  $("countTxt").textContent = rows.length ? `Active deployments: ${rows.length}` : "No active deployments found.";
   if(!rows.length){
-    tb.innerHTML = `<tr><td colspan="5" class="small">Не найдено batch‑ивентов (0xde46a24b…) в последнем диапазоне.</td></tr>`;
+    list.innerHTML = `<div class="count">No active deployments found.</div>`;
     return;
   }
 
   for(const r of rows){
-    const timeStr = r.timeMs ? new Date(r.timeMs).toLocaleString() : "—";
-    const sector = `(${r.sectorX},${r.sectorY})`;
-    const txShort = r.txHash ? `${r.txHash.slice(0,10)}…${r.txHash.slice(-6)}` : "—";
-    const txLink = r.txHash ? `https://mega.etherscan.io/tx/${r.txHash}` : "#";
+    const key = r.key;
+    const custom = state.customDR.get(key);
+    const effectiveDR = Number.isFinite(custom) ? custom : null;
 
-    const partyHtml = (r.party || []).map(h => {
-      const cls = h.survived ? "alive" : "dead";
-      const label = `${h.name} (${h.rarity}) · roll=${h.roll}`;
-      return `<span class="tag ${cls}" title="${h.seed}">${h.survived ? 'OK' : 'DEAD'} · ${label}</span>`;
+    const drInfo = effectiveDR === null
+      ? `Enter DR to evaluate`
+      : `Effective: ${(effectiveDR/100).toFixed(2)}%`;
+
+    const partyHtml = r.party.map(h => {
+      const hasDR = Number.isFinite(effectiveDR);
+      const survived = hasDR ? (h.roll >= effectiveDR) : null;
+      const cls = !hasDR ? "neutral" : (survived ? "ok" : "bad");
+      const tag = !hasDR ? "ROLL" : (survived ? "OK" : "DEAD");
+      const roll = String(h.roll).padStart(4,"0");
+      return `
+        <div class="unit ${cls}" data-seed="${h.seed}">
+          <div class="topline"><span class="tag">${tag}</span><span class="roll">${roll}</span></div>
+          <div class="name">${h.name} (${h.rarity})</div>
+        </div>
+      `;
     }).join("");
 
-    tb.insertAdjacentHTML("beforeend", `
-      <tr>
-        <td>${timeStr}</td>
-        <td><span class="mono">${sector}</span></td>
-        <td><span class="mono">#${r.blockNumber}</span></td>
-        <td class="mono"><a href="${txLink}" target="_blank" rel="noreferrer">${txShort}</a></td>
-        <td><div class="party">${partyHtml || `<span class="small">—</span>`}</div></td>
-      </tr>
+    list.insertAdjacentHTML("beforeend", `
+      <div class="deploy">
+        <div class="deployHead">
+          <div class="cell">
+            <div class="k">Deployed</div>
+            <div class="v">${r.deployedStr}</div>
+          </div>
+          <div class="cell">
+            <div class="k">Sector</div>
+            <div class="v mono">(${r.sectorX},${r.sectorY})</div>
+          </div>
+          <div class="cell">
+            <div class="k">Block</div>
+            <div class="v mono">#${r.blockNum}</div>
+          </div>
+          <div class="cell tx">
+            <div class="k">Stake tx</div>
+            <div class="v">${r.sourceHtml}</div>
+          </div>
+          <div class="cell dr">
+            <div class="k">Custom DR (bps)</div>
+            <input class="mono" inputmode="numeric" autocomplete="off" spellcheck="false"
+              data-depkey="${key}"
+              placeholder="e.g. 3520"
+              value="${Number.isFinite(custom) ? String(custom) : ""}"
+              title="Custom death rate in bps (0..10000). Example: 3520 = 35.20%." />
+            <div class="drInfo">${drInfo}</div>
+          </div>
+        </div>
+        <div class="party">${partyHtml}</div>
+      </div>
     `);
   }
 }
 
-/** === main === */
+/** DR input: keep focus while re-rendering */
+$("list").addEventListener("input", (ev) => {
+  const t = ev.target;
+  if(!(t instanceof HTMLInputElement)) return;
+  const key = t.getAttribute("data-depkey");
+  if(!key) return;
+
+  const selStart = (typeof t.selectionStart === "number") ? t.selectionStart : null;
+  const selEnd   = (typeof t.selectionEnd === "number") ? t.selectionEnd : null;
+
+  const raw = String(t.value || "").trim();
+
+  if(raw === ""){
+    state.customDR.delete(key);
+    render();
+  } else {
+    const v = Number(raw);
+    if(!Number.isFinite(v) || v < 0 || v > 10000){
+      // Avoid re-rendering on invalid input to prevent cursor jumps
+      return;
+    }
+    state.customDR.set(key, Math.floor(v));
+    render();
+  }
+
+  // restore focus & caret after render
+  const again = [...document.querySelectorAll('input[data-depkey]')].find(el => el.dataset.depkey === key);
+  if(again){
+    again.focus({preventScroll:true});
+    if(selStart !== null && selEnd !== null){
+      try { again.setSelectionRange(selStart, selEnd); } catch(_) {}
+    }
+  }
+});
+
+/** click hunter card to copy seed */
+$("list").addEventListener("click", async (ev) => {
+  const el = ev.target.closest?.(".unit");
+  if(!el) return;
+  const seed = el.getAttribute("data-seed");
+  if(!seed) return;
+  try{
+    await navigator.clipboard.writeText(seed);
+    toast("Seed copied");
+  }catch(_){
+    toast("Copy failed (clipboard blocked)");
+  }
+});
+
+/** main */
 async function run(){
   showErr("");
   const w = $("wallet").value.trim();
-  if(!w) { showErr("Вставь wallet address (0x...)"); return; }
-  let wallet;
-  try { wallet = ethers.getAddress(w); } catch(e){ showErr("Невалидный адрес: " + e.message); return; }
+  if(!w){ showErr("Paste a wallet address (0x...)."); return; }
 
-  const deathChanceBps = deathChanceBpsFromDifficulty($("difficulty").value);
-  const wTopic = addrTopic(wallet);
+  let wallet;
+  try { wallet = ethers.getAddress(w); } catch(e){ showErr("Invalid address: " + e.message); return; }
 
   setStatus("Getting latest block…");
   const latestHex = await rpc("eth_blockNumber", []);
   const latest = Number(BigInt(latestHex));
 
-  // scan backwards
-  setStatus("Scanning logs…");
-  const logs = [];
-  let scanned = 0;
-  let toBlock = latest;
-  while(logs.length < TARGET_EVENTS && scanned < MAX_LOOKBACK){
-    const fromBlock = Math.max(0, toBlock - CHUNK + 1);
-    const filter = {
-      address: PROXY,
-      topics: [BATCH_SIG, wTopic],
-      fromBlock: "0x"+fromBlock.toString(16),
-      toBlock: "0x"+toBlock.toString(16),
-    };
-    let chunkLogs = [];
-    try{
-      chunkLogs = await rpc("eth_getLogs", [filter]) || [];
-    }catch(e){
-      // if provider is picky, shrink chunk and retry once
-      if(CHUNK > 10000){
-        showErr("RPC ограничил eth_getLogs. Попробуй ещё раз (я буду сканить более мелкими чанками).");
-      }
-      throw e;
-    }
-    // add newest first later; keep as is then sort
-    logs.push(...chunkLogs);
-    scanned += (toBlock - fromBlock + 1);
-    toBlock = fromBlock - 1;
-    setStatus(`Scanning… found ${logs.length} (lookback ${scanned} blocks)`);
-    if(toBlock <= 0) break;
-  }
+  setStatus("Reading deployments…");
+  const deps = await fetchDeployments(wallet);
 
-  if(!logs.length){
-    setStatus("No events", "bad");
-    renderRows([]);
+  if(!deps.length){
+    state.rows = [];
+    render();
+    setStatus("No deployments", "bad");
     return;
   }
 
-  // sort desc by blockNumber + logIndex
-  logs.sort((a,b)=>{
+  // Build lookup: stake batch logs for wallet (recent blocks), keyed by sector+traits.
+  setStatus("Scanning stake logs…");
+  const fromStake = Math.max(0, latest - STAKE_LOOKBACK_BLOCKS);
+  const stakeLogs = await getLogsChunked({
+    address: PROXY,
+    topics: [BATCH_SIG, addrTopic(wallet)],
+    fromBlock: fromStake,
+    toBlock: latest,
+    chunkSize: STAKE_CHUNK,
+    onProgress: ({total}) => setStatus(`Scanning stake logs… ${total}`)
+  });
+
+  // newest-first; map latest occurrence per key
+  stakeLogs.sort((a,b)=>{
     const ab = Number(BigInt(a.blockNumber));
     const bb = Number(BigInt(b.blockNumber));
     if(ab !== bb) return bb - ab;
@@ -354,12 +627,40 @@ async function run(){
     return bi - ai;
   });
 
-  // keep only latest TARGET_EVENTS
-  const useLogs = logs.slice(0, TARGET_EVENTS);
+  const stakeMap = new Map(); // key -> {blockNum, txHash, sectorX, sectorY, traits}
+  for(const l of stakeLogs){
+    const d = decodeBatchEvent(l);
+    if(!d.traits?.length) continue;
+    const k = stakeKey(d.sectorX, d.sectorY, d.traits);
+    if(!stakeMap.has(k)){
+      stakeMap.set(k, {
+        blockNum: Number(BigInt(l.blockNumber)),
+        txHash: l.transactionHash,
+        sectorX: d.sectorX,
+        sectorY: d.sectorY,
+        traits: d.traits
+      });
+    }
+  }
 
-  // fetch blocks (hash + timestamp) in batch
+  // Decide block numbers to fetch: prefer stake block if match found, else fallback to dep.blockNum
+  const chosenBlocks = [];
+  const chosenInfo = []; // per dep: {matched, blockNum, txHash}
+  for(const dep of deps){
+    const k = stakeKey(dep.x, dep.y, dep.traits || []);
+    const m = stakeMap.get(k);
+    if(m){
+      chosenInfo.push({ matched:true, blockNum:m.blockNum, txHash:m.txHash });
+      chosenBlocks.push(m.blockNum);
+    }else{
+      chosenInfo.push({ matched:false, blockNum:dep.blockNum || 0, txHash:null });
+      if(dep.blockNum) chosenBlocks.push(dep.blockNum);
+    }
+  }
+
+  // fetch blocks (hash+timestamp) in batch
   setStatus("Fetching blocks…");
-  const uniqBlocks = [...new Set(useLogs.map(l => Number(BigInt(l.blockNumber))))];
+  const uniqBlocks = [...new Set(chosenBlocks.filter(Boolean))];
   const blockReqs = uniqBlocks.map(bn => ({method:"eth_getBlockByNumber", params:["0x"+bn.toString(16), false]}));
   const blockRes = await rpcBatch(blockReqs);
   const blockMap = new Map();
@@ -371,59 +672,59 @@ async function run(){
     }
   }
 
-  setStatus("Predicting…");
-  const player20 = ethers.getBytes(wallet); // 20 bytes
+  setStatus("Computing rolls…");
+  const player20 = ethers.getBytes(wallet);
 
-  const rows = useLogs.map(l => {
-    const bn = Number(BigInt(l.blockNumber));
-    const txHash = l.transactionHash;
+  const rows = [];
+  for(let i=0;i<deps.length;i++){
+    const dep = deps[i];
+    const info = chosenInfo[i];
+    const bn = info.blockNum;
     const blk = blockMap.get(bn);
-    const ts = blk?.ts ?? 0;
-    const blockHash = blk?.hash ?? null;
+    const bh = blk?.hash;
+    const ts = blk?.ts ?? dep.ts ?? 0;
+    if(!bh || !ts || !dep.traits?.length) continue;
 
-    const decoded = decodeBatchEvent(l);
-    const party = [];
-    if(blockHash){
-      for(let i=0;i<decoded.traits.length;i++){
-        const hunterId = decoded.traits[i];
-        const pr = predictDuneStyle({
-          player20,
-          timestampSec: ts,
-          sectorX: decoded.sectorX,
-          sectorY: decoded.sectorY,
-          hunterId,
-          hunterIndex: i,
-          blockHash
-        }, deathChanceBps);
+    const party = dep.traits.map((hunterId, idx) => {
+      const pr = computeRoll({
+        player20,
+        timestampSec: ts,
+        sectorX: dep.x,
+        sectorY: dep.y,
+        hunterId,
+        hunterIndex: idx,
+        blockHash: bh
+      });
+      const name = HUNTER_NAME.get(hunterId) || ("#"+hunterId);
+      return { hunterId, idx, name, rarity: rarityTag(hunterId), roll: pr.roll, seed: pr.seed };
+    });
 
-        const name = HUNTER_NAME.get(hunterId) || ("#"+hunterId);
-        party.push({
-          hunterId,
-          idx: i,
-          name,
-          rarity: rarityTag(hunterId),
-          roll: pr.roll,
-          seed: pr.seed,
-          survived: pr.survived
-        });
-      }
-    }
+    const deployedStr = new Date((dep.ts || ts)*1000).toLocaleString();
+    const sourceHtml = info.matched
+      ? `<a href="https://mega.etherscan.io/tx/${info.txHash}" target="_blank" rel="noreferrer">${shortHex(info.txHash)}</a>`
+      : `<span class="mono">#${dep.id}</span> <span style="color:var(--muted);font-size:12px">(no stake match)</span>`;
 
-    return {
-      timeMs: ts ? ts*1000 : null,
-      sectorX: decoded.sectorX,
-      sectorY: decoded.sectorY,
-      blockNumber: bn,
-      txHash,
+    rows.push({
+      key: depKey(dep),
+      deployedStr,
+      sectorX: dep.x,
+      sectorY: dep.y,
+      blockNum: bn,
+      sourceHtml,
       party
-    };
-  });
+    });
+  }
 
-  renderRows(rows);
-  setStatus("Done", "ok");
+  rows.sort((a,b)=> (b.blockNum||0) - (a.blockNum||0));
+  state.rows = rows;
+
+  $("lastScanTxt").textContent = `Last scan: ${new Date().toLocaleString()}`;
+  render();
+  setStatus(`Done — ${rows.length} active`, rows.length ? "ok" : "bad");
 }
 
 $("runBtn").addEventListener("click", () => {
+  setStatus("Working…");
   run().catch(e => {
     console.error(e);
     setStatus("Error", "bad");
