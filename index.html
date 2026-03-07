@@ -85,13 +85,60 @@
       padding:10px 12px;
       outline:none;
     }
-    input:focus{border-color:#6ea8ff; box-shadow:0 0 0 3px rgba(110,168,255,.14)}
+    input:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(110,168,255,.14)}
     input.mono{font-family:var(--mono)}
     input.wallet{min-width:420px}
+    select.wallet{padding-right: 10px;}
     @media (max-width: 520px){ input.wallet{min-width:0;width:100%} }
     button{cursor:pointer;font-weight:700}
     button:hover{border-color:#6ea8ff}
     button:active{transform:translateY(1px)}
+
+/* difficulty buttons */
+.diffGroup{
+  display:flex;
+  gap:6px;
+  padding:6px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:var(--panel2);
+  min-width:320px;
+}
+.diffBtn{
+  flex:1;
+  min-width:52px;
+  padding:8px 10px;
+  border-radius:12px;
+  border:1px solid transparent;
+  background:transparent;
+  color:var(--muted);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  line-height:1.05;
+  cursor:pointer;
+  user-select:none;
+}
+
+.diffBtn{ --accent:#6ea8ff; }
+.diffBtn[data-d="1"]{ --accent: rgba(90,184,64,.75); }
+.diffBtn[data-d="2"]{ --accent: rgba(200,160,32,.75); }
+.diffBtn[data-d="3"]{ --accent: rgba(192,112,48,.75); }
+.diffBtn[data-d="4"]{ --accent: rgba(192,64,48,.78); }
+.diffBtn[data-d="5"]{ --accent: rgba(255,92,122,.78); }
+.diffBtn[data-d="6"]{ --accent: rgba(216,32,32,.82); }
+.diffBtn:hover{border-color:var(--accent); color:var(--text)}
+.diffBtn.active{
+  border-color:var(--accent);
+  color:var(--text);
+  background:var(--panel);
+}
+.diffBtn .d{font-weight:900;font-size:12px;letter-spacing:.2px}
+.diffBtn .p{font-size:11px;color:var(--muted2);margin-top:4px}
+@media (max-width: 520px){
+  .diffGroup{min-width:0;width:100%}
+}
     .small{color:var(--muted);font-size:12px;margin-top:10px}
     .err{
       margin-top:10px;
@@ -173,6 +220,32 @@
     .unit.ok .name{color:rgba(46,229,157,.95)}
     .unit.bad .name{color:rgba(255,92,122,.95)}
 
+
+/* custom DR */
+.drTop{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.miniBtn{
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:transparent;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer;
+  user-select:none;
+}
+.miniBtn:hover{border-color:#6ea8ff;color:var(--text)}
+.miniBtn.active{
+  border-color:#6ea8ff;
+  color:var(--text);
+  background:rgba(110,168,255,.10);
+}
+.customDrInput{
+  width:100%;
+  border:1px dashed var(--border2);
+  background:var(--panel);
+}
+
     /* toast */
     .toast{
       position:fixed;
@@ -198,7 +271,7 @@
         <div class="mark">HT</div>
         <div>
           <div class="h1">Huntertales — Active Deployment Predictor</div>
-          <div class="sub">Scans your wallet for <b>active</b> deployments (no outcome tx yet). Enter <b>Custom DR</b> per deployment in <b>bps</b> (e.g. 3520 = 35.20%). Click a hunter card to copy its full seed.</div>
+          <div class="sub">Scans a wallet for <b>active</b> deployments and predicts outcomes from the on-chain roll formula. Choose dungeon difficulty; the tool applies your <b>Survival</b> upgrade reduction and the <b>squad DR reduction</b> (based on party power). Click a hunter card to copy its full seed.</div>
         </div>
       </div>
       <div class="rightMeta">
@@ -213,12 +286,30 @@
           <label>Wallet address</label>
           <input id="wallet" class="wallet mono" placeholder="0x..." autocomplete="off" spellcheck="false" />
         </div>
+
+        <div style="min-width:360px">
+  <label>Dungeon difficulty</label>
+  <div class="diffGroup" id="diffGroup" role="radiogroup" aria-label="Dungeon difficulty">
+    <button type="button" class="diffBtn" data-d="1" aria-label="D1 8 percent"><span class="d">D1</span><span class="p">8%</span></button>
+    <button type="button" class="diffBtn" data-d="2" aria-label="D2 18 percent"><span class="d">D2</span><span class="p">18%</span></button>
+    <button type="button" class="diffBtn" data-d="3" aria-label="D3 32 percent"><span class="d">D3</span><span class="p">32%</span></button>
+    <button type="button" class="diffBtn" data-d="4" aria-label="D4 40 percent"><span class="d">D4</span><span class="p">40%</span></button>
+    <button type="button" class="diffBtn" data-d="5" aria-label="D5 50 percent"><span class="d">D5</span><span class="p">50%</span></button>
+    <button type="button" class="diffBtn" data-d="6" aria-label="D6 60 percent"><span class="d">D6</span><span class="p">60%</span></button>
+  </div>
+</div>
+
         <div>
           <button id="runBtn">Scan</button>
         </div>
       </div>
+
+      <div class="controlsRow" style="margin-top:6px;align-items:flex-start">
+        <div id="survivalBox" class="small" style="flex:1;opacity:.9"></div>
+        <div class="small">RPC: <span class="mono" id="rpcLabel"></span></div>
+      </div>
+
       <div id="err" class="err"></div>
-      <div class="small">RPC: <span class="mono" id="rpcLabel"></span></div>
     </div>
 
     <div class="results">
@@ -251,7 +342,7 @@ const GAME_ID = 1;
 const BATCH_SIG = "0xde46a24bd2bb7c32c4d7f4a89fae5b9dc30e0980d7a22a8c9600f6765a8d940b";
 
 /** heuristics */
-const STAKE_LOOKBACK_BLOCKS = 300000;   // recent stake logs should cover active deployments
+const STAKE_LOOKBACK_BLOCKS = 2000000;   // recent stake logs should cover active deployments
 const STAKE_CHUNK = 50000;
 
 /** season = 1 */
@@ -274,6 +365,27 @@ function rarityTag(id){
   if(id>=17 && id<=20) return "L";
   if(id>=21 && id<=24) return "T";
   return "?";
+
+}
+
+/** party power weights (custom ratio; x10 to avoid decimals) */
+const PWR_X10 = { C:36, U:80, R:220, E:400, L:1000, T:2500 };
+
+function hunterPowerX10(id){
+  const r = rarityTag(id);
+  return (PWR_X10[r] ?? 0);
+}
+
+function computePartyPowerX10(traits){
+  if(!traits || !traits.length) return 0;
+  let sum = 0;
+  for(const id of traits) sum += hunterPowerX10(Number(id));
+  return sum;
+}
+
+function fmtPowerX10(p){
+  const n = (Number(p)||0) / 10;
+  return n.toFixed(1).replace(/\.0$/, "");
 }
 
 /** UI */
@@ -457,9 +569,172 @@ function computeRoll({player20, timestampSec, sectorX, sectorY, hunterId, hunter
 
 /** state */
 let state = {
-  customDR: new Map(),   // depKey -> number(bps)
-  rows: []
+  rows: [],
+  diff: 4,
+  survivalLevel: 0,
+  customEnabled: Object.create(null),
+  customRaw: Object.create(null),
+  customBps: Object.create(null)
 };
+
+const LS_DIFF_KEY = "ht_diff_sel_v1";
+const LS_WALLET_KEY = "ht_wallet_last_v1";
+
+function setDiff(d, {silent=false} = {}){
+  state.diff = Number(d) || 4;
+  try{ localStorage.setItem(LS_DIFF_KEY, String(state.diff)); }catch(_){}
+  document.querySelectorAll(".diffBtn").forEach(btn=>{
+    const on = Number(btn.dataset.d) === state.diff;
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-checked", String(on));
+  });
+  if(!silent) render();
+}
+
+// restore last settings
+try{
+  const savedDiff = localStorage.getItem(LS_DIFF_KEY);
+  if(savedDiff) state.diff = Number(savedDiff) || 4;
+}catch(_){}
+
+try{
+  const savedWallet = localStorage.getItem(LS_WALLET_KEY);
+  if(savedWallet && $("wallet")) $("wallet").value = savedWallet;
+}catch(_){}
+
+document.querySelectorAll(".diffBtn").forEach(btn=>{
+  btn.setAttribute("role","radio");
+  btn.addEventListener("click", ()=> setDiff(btn.dataset.d));
+  btn.addEventListener("keydown", (e)=>{
+    if(e.key === "Enter" || e.key === " "){
+      e.preventDefault();
+      setDiff(btn.dataset.d);
+    }
+  });
+});
+
+// initialize active state
+setDiff(state.diff || 4, {silent:true});
+render();
+
+// difficulty → base death rate (bps)
+function baseDrBps(diff){
+  switch(Number(diff)){
+    case 1: return 800;
+    case 2: return 1800;
+    case 3: return 3200;
+    case 4: return 4000;
+    case 5: return 5000;
+    case 6: return 6000;
+    default: return 4000;
+  }
+}
+
+// Survival upgrade level → DR reduction (bps)
+// Lv1=2.4%, Lv2=4.8%, Lv3=7.2%, Lv4=9.6%, Lv5=12.0%
+function survivalReductionBps(level){
+  const lv = Math.max(0, Math.min(5, Number(level) || 0));
+  return lv * 240;
+}
+
+function clampBps(x){
+  if(!Number.isFinite(x)) return 0;
+  return Math.max(0, Math.min(10000, Math.floor(x)));
+}
+
+function fmtPct(bps){ return (bps/100).toFixed(2) + "%"; }
+function fmtPctTrim(bps){
+  let s = (bps/100).toFixed(2);
+  s = s.replace(/\.00$/,"");
+  s = s.replace(/(\.\d)0$/,"$1");
+  return s + "%";
+}
+
+
+function parseCustomDrToBps(raw){
+  if(raw == null) return null;
+  let s = String(raw).trim();
+  if(!s) return null;
+  s = s.replace(/,/g, ".");
+  const hasPct = s.includes("%");
+  s = s.replace("%","").trim();
+  if(!s) return null;
+  const n = Number(s);
+  if(!Number.isFinite(n)) return null;
+  let bps;
+  if(hasPct || n <= 100){
+    bps = Math.round(n * 100);
+  }else{
+    bps = Math.round(n);
+  }
+  return clampBps(bps);
+}
+
+function applyReductionBps(baseBps, reductionBps){
+  const b = BigInt(clampBps(baseBps));
+  const r = BigInt(clampBps(reductionBps));
+  const out = (b * (10000n - r)) / 10000n;
+  return Number(out);
+}
+
+// Squad DR reduction from party power (diminishing returns; max 20.00%)
+// Uses custom power ratio units (x10). Calibrated to match the previous curve.
+function calcSquadReductionBps(partyPowerX10){
+  const p = BigInt(Math.max(0, Number(partyPowerX10)||0));
+  if(p === 0n) return 0;
+  const CAP = 2415n; // calibrated so 8x Legendary -> ~27.5% final on D4 with Survival Lv5
+  const K   = 833n;   // ~1000/12 * 10 (since L went 1200 -> 100)
+  const bps = (CAP * p) / (p + K);
+  return Number(bps);
+}
+
+// detect whether dep.powerWei is scaled (1e18) or already an int
+function normalizePartyPower(powerWei){
+  try{
+    const v = BigInt(powerWei || 0);
+    if(v >= 10n**12n) return Number(v / 10n**18n);
+    return Number(v);
+  }catch(_){
+    return 0;
+  }
+}
+
+/** === Survival upgrade parsing ===
+ * Upgrade contract emits:
+ * topic0 = UPGRADE_SIG
+ * topic1 = player (indexed)
+ * topic2 = upgradeId (indexed)
+ * data[0:32] = newLevel
+ */
+const UPGRADE_CONTRACT = "0x45A3819c55f252F91a021998C20b918A54dD5A93";
+const UPGRADE_SIG = "0x8e242bc17594444b4ca479937410609b4608d4301fa874435028d025c2b3fadc";
+const SURVIVAL_UPGRADE_ID_TOPIC = "0x" + "1".padStart(64,"0");
+
+async function fetchSurvivalLevel(wallet){
+  try{
+    const logs = await rpc("eth_getLogs", [{
+      address: UPGRADE_CONTRACT,
+      topics: [UPGRADE_SIG, addrTopic(wallet), SURVIVAL_UPGRADE_ID_TOPIC],
+      fromBlock: "0x0",
+      toBlock: "latest"
+    }]) || [];
+    if(!logs.length) return { level: 0, txHash: null, block: null };
+
+    logs.sort((a,b)=>{
+      const ab = Number(BigInt(a.blockNumber));
+      const bb = Number(BigInt(b.blockNumber));
+      if(ab !== bb) return ab - bb;
+      const ai = Number(BigInt(a.logIndex));
+      const bi = Number(BigInt(b.logIndex));
+      return ai - bi;
+    });
+    const last = logs[logs.length - 1];
+    const lvl = Number(BigInt(last.data.slice(0, 66)));
+    return { level: lvl, txHash: last.transactionHash, block: Number(BigInt(last.blockNumber)) };
+  }catch(e){
+    return { level: 0, txHash: null, block: null, error: String(e?.message || e) };
+  }
+}
 
 function depKey(dep){ return `${dep.id}:${dep.x},${dep.y}:${(dep.traits||[]).join(",")}`; }
 function stakeKey(x,y,traits){ return `${x},${y}|${(traits||[]).join(",")}`; }
@@ -475,23 +750,30 @@ function render(){
     return;
   }
 
-  for(const r of rows){
-    const key = r.key;
-    const custom = state.customDR.get(key);
-    const effectiveDR = Number.isFinite(custom) ? custom : null;
+  const diff = Number(state.diff) || 4;
+  const base = baseDrBps(diff);
+  const survBps = survivalReductionBps(state.survivalLevel);
 
-    const drInfo = effectiveDR === null
-      ? `Enter DR to evaluate`
-      : `Effective: ${(effectiveDR/100).toFixed(2)}%`;
+  for(const r of rows){
+    const partyPowerX10 = (Number(r.partyPowerX10) || 0);
+    const squadBps = calcSquadReductionBps(partyPowerX10);
+    const partyPowerLabel = fmtPowerX10(partyPowerX10);
+
+    const afterSurvival = applyReductionBps(base, survBps);
+    const finalBps = applyReductionBps(afterSurvival, squadBps);
+
+    const key = r.key;
+    const customEnabled = !!state.customEnabled[key];
+    const computedFinalBps = finalBps;
+    const activeFinalBps = (customEnabled && Number.isFinite(state.customBps[key])) ? state.customBps[key] : computedFinalBps;
 
     const partyHtml = r.party.map(h => {
-      const hasDR = Number.isFinite(effectiveDR);
-      const survived = hasDR ? (h.roll >= effectiveDR) : null;
-      const cls = !hasDR ? "neutral" : (survived ? "ok" : "bad");
-      const tag = !hasDR ? "ROLL" : (survived ? "OK" : "DEAD");
+      const survived = (h.roll >= activeFinalBps);
+      const cls = survived ? "ok" : "bad";
+      const tag = survived ? "OK" : "DEAD";
       const roll = String(h.roll).padStart(4,"0");
       return `
-        <div class="unit ${cls}" data-seed="${h.seed}">
+        <div class="unit ${cls}" data-seed="${h.seed}" data-roll="${h.roll}">
           <div class="topline"><span class="tag">${tag}</span><span class="roll">${roll}</span></div>
           <div class="name">${h.name} (${h.rarity})</div>
         </div>
@@ -499,7 +781,7 @@ function render(){
     }).join("");
 
     list.insertAdjacentHTML("beforeend", `
-      <div class="deploy">
+      <div class="deploy" data-key="${key}" data-computed-final-bps="${computedFinalBps}">
         <div class="deployHead">
           <div class="cell">
             <div class="k">Deployed</div>
@@ -517,14 +799,21 @@ function render(){
             <div class="k">Stake tx</div>
             <div class="v">${r.sourceHtml}</div>
           </div>
-          <div class="cell dr">
-            <div class="k">Custom DR (bps)</div>
-            <input class="mono" inputmode="numeric" autocomplete="off" spellcheck="false"
-              data-depkey="${key}"
-              placeholder="e.g. 3520"
-              value="${Number.isFinite(custom) ? String(custom) : ""}"
-              title="Custom death rate in bps (0..10000). Example: 3520 = 35.20%." />
-            <div class="drInfo">${drInfo}</div>
+          <div class="cell dr" data-key="${key}">
+            <div class="drTop">
+              <div class="k">Final death chance</div>
+              <button type="button" class="miniBtn drToggle ${customEnabled ? "active" : ""}" data-key="${key}" aria-pressed="${customEnabled}">${customEnabled ? "Auto" : "Custom"}</button>
+            </div>
+            <div class="v mono">
+              ${customEnabled
+                ? `<input class="customDrInput mono" data-key="${key}" inputmode="numeric" autocomplete="off" spellcheck="false"
+                      placeholder="e.g. 3450 (34.5%)"
+                      title="Enter DR as bps (0-10000). You can also type a percent like 34.5%."
+                      value="${(state.customRaw[key] ?? '')}" />`
+                : `<span class="finalPct" data-key="${key}">${fmtPct(activeFinalBps)}</span>`
+              }
+            </div>
+            <div class="drInfo"><span class="mono">Power ${partyPowerLabel}</span></div>
           </div>
         </div>
         <div class="party">${partyHtml}</div>
@@ -533,43 +822,75 @@ function render(){
   }
 }
 
-/** DR input: keep focus while re-rendering */
-$("list").addEventListener("input", (ev) => {
-  const t = ev.target;
-  if(!(t instanceof HTMLInputElement)) return;
-  const key = t.getAttribute("data-depkey");
-  if(!key) return;
-
-  const selStart = (typeof t.selectionStart === "number") ? t.selectionStart : null;
-  const selEnd   = (typeof t.selectionEnd === "number") ? t.selectionEnd : null;
-
-  const raw = String(t.value || "").trim();
-
-  if(raw === ""){
-    state.customDR.delete(key);
-    render();
-  } else {
-    const v = Number(raw);
-    if(!Number.isFinite(v) || v < 0 || v > 10000){
-      // Avoid re-rendering on invalid input to prevent cursor jumps
-      return;
-    }
-    state.customDR.set(key, Math.floor(v));
-    render();
-  }
-
-  // restore focus & caret after render
-  const again = [...document.querySelectorAll('input[data-depkey]')].find(el => el.dataset.depkey === key);
-  if(again){
-    again.focus({preventScroll:true});
-    if(selStart !== null && selEnd !== null){
-      try { again.setSelectionRange(selStart, selEnd); } catch(_) {}
-    }
-  }
-});
-
 /** click hunter card to copy seed */
+function updateDeploymentUI(key){
+  const dep = document.querySelector(`.deploy[data-key="${key}"]`);
+  if(!dep) return;
+
+  const computed = Number(dep.dataset.computedFinalBps) || 0;
+  let finalBps = computed;
+
+  if(state.customEnabled[key]){
+    const bps = state.customBps[key];
+    if(Number.isFinite(bps)) finalBps = bps;
+  }
+
+  // Update hunter chips
+  for(const u of dep.querySelectorAll(".unit")){
+    const roll = Number(u.dataset.roll);
+    const survived = roll >= finalBps;
+    u.classList.toggle("ok", survived);
+    u.classList.toggle("bad", !survived);
+    const tagEl = u.querySelector(".tag");
+    if(tagEl) tagEl.textContent = survived ? "OK" : "DEAD";
+  }
+
+  // Keep the input tooltip informative
+  const inp = dep.querySelector(`input.customDrInput[data-key="${key}"]`);
+  if(inp){
+    const parsed = parseCustomDrToBps(inp.value);
+    const using = Number.isFinite(parsed) ? parsed : computed;
+    inp.title = `Enter DR as bps (0-10000). You can also type a percent like 34.5%. Using: ${fmtPct(using)} (computed: ${fmtPct(computed)})`;
+  }
+
+  // Update computed percent when in auto mode
+  const pct = dep.querySelector(`.finalPct[data-key="${key}"]`);
+  if(pct) pct.textContent = fmtPct(finalBps);
+}
+
 $("list").addEventListener("click", async (ev) => {
+  const tog = ev.target.closest?.(".drToggle");
+  if(tog){
+    const key = tog.dataset.key;
+    if(!key) return;
+
+    const now = !state.customEnabled[key];
+    state.customEnabled[key] = now;
+
+    if(now){
+      const dep = tog.closest(".deploy");
+      const computed = dep ? Number(dep.dataset.computedFinalBps) : null;
+
+      // Pre-fill with computed bps for quick editing
+      if((state.customRaw[key] == null || String(state.customRaw[key]).trim() === "") && Number.isFinite(computed)){
+        state.customRaw[key] = String(computed);
+        state.customBps[key] = computed;
+      }else{
+        state.customBps[key] = parseCustomDrToBps(state.customRaw[key]);
+      }
+    }
+
+    render();
+
+    if(now){
+      setTimeout(() => {
+        const inp = document.querySelector(`input.customDrInput[data-key="${key}"]`);
+        if(inp){ inp.focus(); inp.select(); updateDeploymentUI(key); }
+      }, 0);
+    }
+    return;
+  }
+
   const el = ev.target.closest?.(".unit");
   if(!el) return;
   const seed = el.getAttribute("data-seed");
@@ -582,21 +903,48 @@ $("list").addEventListener("click", async (ev) => {
   }
 });
 
+$("list").addEventListener("input", (ev) => {
+  const inp = ev.target.closest?.(".customDrInput");
+  if(!inp) return;
+  const key = inp.dataset.key;
+  if(!key) return;
+  state.customRaw[key] = inp.value;
+  state.customBps[key] = parseCustomDrToBps(inp.value);
+  updateDeploymentUI(key);
+});
+
 /** main */
 async function run(){
   showErr("");
   const w = $("wallet").value.trim();
   if(!w){ showErr("Paste a wallet address (0x...)."); return; }
 
-  let wallet;
-  try { wallet = ethers.getAddress(w); } catch(e){ showErr("Invalid address: " + e.message); return; }
+let wallet;
+try { wallet = ethers.getAddress(w); } catch(e){ showErr("Invalid address: " + e.message); return; }
 
-  setStatus("Getting latest block…");
+// persist settings
+try{ localStorage.setItem(LS_DIFF_KEY, String(state.diff)); }catch(_){ }
+try{ localStorage.setItem(LS_WALLET_KEY, wallet); }catch(_){ }
+setStatus("Getting latest block…");
   const latestHex = await rpc("eth_blockNumber", []);
   const latest = Number(BigInt(latestHex));
 
-  setStatus("Reading deployments…");
-  const deps = await fetchDeployments(wallet);
+  setStatus("Reading deployments & upgrades…");
+  const [deps, surv] = await Promise.all([
+    fetchDeployments(wallet),
+    fetchSurvivalLevel(wallet)
+  ]);
+
+  state.survivalLevel = Number(surv?.level || 0);
+  const survBps = survivalReductionBps(state.survivalLevel);
+  const sb = $("survivalBox");
+  if(sb){
+    if(surv?.error){
+      sb.textContent = `Survival upgrade: unknown (${surv.error})`;
+    }else{
+      sb.innerHTML = `Survival upgrade: <span class="mono">Lv ${state.survivalLevel}</span> (−<span class="mono">${fmtPctTrim(survBps)}</span> of base)`;
+    }
+  }
 
   if(!deps.length){
     state.rows = [];
@@ -709,6 +1057,8 @@ async function run(){
       deployedStr,
       sectorX: dep.x,
       sectorY: dep.y,
+      partyPowerX10: computePartyPowerX10(dep.traits),
+      partyPowerWei: dep.powerWei,
       blockNum: bn,
       sourceHtml,
       party
